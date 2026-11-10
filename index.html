@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F2F3F3">
+  <meta name="description" content="Dashboard del sistema de monitoreo de temperatura y humedad con Arduino MEGA 2560 y sensor DHT11: lectura en binario, matriz de bits, color en HEX y RGB y gráfico de la sesión.">
+  <title>Monitoreo de temperatura y humedad</title>
+  <!-- Ícono de la pestaña: el byte 00100000 (32 °C) como una fila de casillas -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%231F2328'/%3E%3Cg fill='%2330363C'%3E%3Crect x='4' y='6' width='5' height='9' rx='1'/%3E%3Crect x='10.5' y='6' width='5' height='9' rx='1'/%3E%3Crect x='23.5' y='6' width='5' height='9' rx='1'/%3E%3Crect x='4' y='17' width='5' height='9' rx='1'/%3E%3Crect x='10.5' y='17' width='5' height='9' rx='1'/%3E%3Crect x='17' y='17' width='5' height='9' rx='1'/%3E%3Crect x='23.5' y='17' width='5' height='9' rx='1'/%3E%3C/g%3E%3Crect x='17' y='6' width='5' height='9' rx='1' fill='%23F7F7F7'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <a class="salto" href="#contenido">Saltar al contenido</a>
+
+  <div class="pagina">
+
+    <header class="cabecera">
+      <div class="cabecera__texto">
+        <h1 class="cabecera__titulo">Monitoreo de temperatura y humedad</h1>
+        <p class="cabecera__bajada">Arduino MEGA 2560 y sensor DHT11. Cada temperatura se convierte a 8&nbsp;bits en complemento a dos.</p>
+      </div>
+
+      <div class="fuente">
+        <p class="fuente__estado" role="status">
+          <span class="fuente__marca" id="estado-marca" data-estado="sin-conexion" aria-hidden="true"></span>
+          <span id="estado-texto">Sin conexión con el Arduino.</span>
+        </p>
+
+        <div class="fuente__acciones">
+          <div class="ritmo" id="ritmo" role="radiogroup" aria-labelledby="ritmo-titulo" hidden>
+            <span class="ritmo__titulo" id="ritmo-titulo">Una lectura cada</span>
+            <label class="ritmo__opcion">
+              <input type="radio" name="ritmo" value="5000">
+              <span>5&nbsp;s</span>
+            </label>
+            <label class="ritmo__opcion">
+              <input type="radio" name="ritmo" value="500" checked>
+              <span>0,5&nbsp;s</span>
+            </label>
+          </div>
+          <button class="boton" id="btn-simular" type="button">Simular lecturas</button>
+          <button class="boton boton--primario" id="btn-conectar" type="button">Conectar Arduino</button>
+        </div>
+
+        <p class="fuente__ayuda" id="ayuda" role="alert" hidden></p>
+        <p class="fuente__nota" id="sin-serial" hidden>Este navegador no puede leer el puerto USB. Abre la página en Chrome o Edge de escritorio para conectar el Arduino; la simulación sí funciona aquí.</p>
+      </div>
+    </header>
+
+    <main id="contenido">
+
+      <!-- Zona 1: los datos de temperatura -->
+      <section class="zona" aria-labelledby="titulo-lectura">
+        <div class="zona__guia">
+          <h2 class="zona__titulo" id="titulo-lectura">Lectura actual</h2>
+          <p class="zona__nota">La temperatura en decimal y su patrón de 8&nbsp;bits. Las casillas en&nbsp;1 se encienden con el color que le corresponde a la lectura.</p>
+
+          <div class="sesion">
+            <p class="sesion__dato">
+              <span class="sesion__numero" id="sesion-numero">Sesión de medición 1</span>
+              <span class="sesion__paleta" id="sesion-paleta">Paleta Térmica</span>
+            </p>
+            <button class="boton" id="btn-sesion" type="button">Nueva sesión</button>
+          </div>
+        </div>
+
+        <div class="zona__cuerpo lectura">
+          <div class="lectura__decimal">
+            <p class="lectura__temperatura" id="temperatura" aria-label="Temperatura: sin lectura">
+              <span class="lectura__cifra" id="temp-cifra">––</span><span class="lectura__unidad">°C</span>
+            </p>
+            <dl class="lectura__datos">
+              <div>
+                <dt>Humedad relativa</dt>
+                <dd id="humedad">–</dd>
+              </div>
+              <div>
+                <dt>Lectura</dt>
+                <dd id="numero-lectura">–</dd>
+              </div>
+            </dl>
+          </div>
+
+          <figure class="byte">
+            <div class="byte__rejilla" id="byte-rejilla" role="img" aria-label="Patrón de 8 bits: sin lectura" translate="no"></div>
+            <figcaption class="byte__pie">
+              <span id="byte-suma">Todavía no hay lecturas. Conecta el Arduino por USB o inicia la simulación.</span>
+              <span id="byte-hex"></span>
+            </figcaption>
+          </figure>
+
+          <p class="trama">
+            <span class="trama__rotulo" id="trama-rotulo">Última trama recibida</span>
+            <code class="trama__texto" id="trama" translate="no">ninguna todavía</code>
+          </p>
+        </div>
+      </section>
+
+      <!-- Zona 2: la matriz de bits y los indicadores de color -->
+      <section class="zona" aria-labelledby="titulo-matriz">
+        <div class="zona__guia">
+          <h2 class="zona__titulo" id="titulo-matriz">Matriz de bits</h2>
+          <p class="zona__nota">Cada fila es el byte de una lectura y cada columna un bit. La lectura nueva entra por arriba y las demás bajan. Un clic en una casilla cambia ese bit.</p>
+
+          <div class="edicion" id="edicion" hidden>
+            <p>Estás editando a mano: las lecturas nuevas no entran a la matriz.</p>
+            <button class="boton" id="btn-reanudar" type="button">Volver a las lecturas</button>
+          </div>
+        </div>
+
+        <div class="zona__cuerpo tablero">
+          <div class="matriz" id="matriz" role="grid" translate="no" aria-label="Matriz de 8 por 8 bits. Con las flechas se cambia de casilla."></div>
+
+          <div class="color">
+            <h3 class="bloque__titulo">Color en uso</h3>
+            <div class="color__ficha">
+              <div class="color__muestra" id="color-muestra" role="img" aria-label="Sin color: todavía no hay lecturas"></div>
+              <dl class="color__codigos">
+                <div>
+                  <dt>HEX</dt>
+                  <dd id="color-hex" translate="no">–</dd>
+                </div>
+                <div>
+                  <dt>RGB</dt>
+                  <dd id="color-rgb" translate="no">–</dd>
+                </div>
+              </dl>
+            </div>
+            <p class="color__explica" id="color-explica">El color sale de la temperatura de la última lectura y de la paleta de la sesión.</p>
+            <div class="canales__marco" id="canales" hidden>
+              <table class="canales">
+                <caption class="visualmente-oculto">Cálculo del color canal por canal: tono de cada extremo, resultado y su valor en base 16</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Canal</th>
+                    <th scope="col" class="num" id="canal-a">Ca</th>
+                    <th scope="col" class="num" id="canal-b">Cb</th>
+                    <th scope="col" class="num" id="canal-c">Resultado</th>
+                    <th scope="col" class="num">Hex</th>
+                    <th scope="col">De hex a decimal</th>
+                  </tr>
+                </thead>
+                <tbody id="canales-cuerpo"></tbody>
+              </table>
+            </div>
+            <!-- La misma comprobación de la última columna, para cuando la tabla no cabe completa -->
+            <ul class="color__base16" id="color-base16" hidden></ul>
+          </div>
+
+          <div class="valor64">
+            <div class="valor64__grupo valor64__grupo--hex">
+              <h3 class="bloque__titulo">Valor de 64&nbsp;bits</h3>
+              <p class="valor64__hex" id="valor-hex" translate="no">00 00 00 00 00 00 00 00</p>
+              <button class="boton boton--menor" id="btn-copiar" type="button" aria-live="polite">Copiar código</button>
+            </div>
+
+            <div class="valor64__grupo valor64__grupo--bits">
+              <h3 class="bloque__titulo">Flujo binario</h3>
+              <p class="valor64__bits" id="valor-bits" translate="no"></p>
+            </div>
+
+            <form class="carga" id="form-hex" novalidate>
+              <label class="carga__rotulo" for="campo-hex">Cargar un código hexadecimal</label>
+              <div class="carga__fila">
+                <input class="carga__campo" id="campo-hex" name="codigo" type="text"
+                       autocomplete="off" autocapitalize="characters" spellcheck="false"
+                       maxlength="32" placeholder="Ej.: 201F1F1E…"
+                       aria-describedby="carga-ayuda carga-error">
+                <button class="boton" type="submit">Cargar</button>
+              </div>
+              <p class="carga__error" id="carga-error" aria-live="polite"></p>
+              <p class="carga__ayuda" id="carga-ayuda">Hasta 16 dígitos. Si son menos, se completa con ceros a la izquierda.</p>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- Zona 3: el gráfico de temperatura -->
+      <section class="zona" aria-labelledby="titulo-grafico">
+        <div class="zona__guia">
+          <h2 class="zona__titulo" id="titulo-grafico">Temperatura de la sesión</h2>
+          <p class="zona__nota">Una lectura cada 5&nbsp;segundos en una ventana de 10&nbsp;minutos. El área entre la curva y la referencia de 30&nbsp;°C se rellena por bandas de 1&nbsp;°C.</p>
+
+          <dl class="resumen">
+            <div>
+              <dt>Promedio</dt>
+              <dd id="res-promedio">–</dd>
+            </div>
+            <div>
+              <dt>Máxima</dt>
+              <dd id="res-maxima">–</dd>
+            </div>
+            <div>
+              <dt>Mínima</dt>
+              <dd id="res-minima">–</dd>
+            </div>
+            <div>
+              <dt>Tendencia</dt>
+              <dd id="res-tendencia">–</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="zona__cuerpo">
+          <ul class="leyenda" aria-label="Leyenda del gráfico">
+            <li><span class="leyenda__rampa" id="leyenda-sobre" aria-hidden="true"></span>Sobre la referencia</li>
+            <li><span class="leyenda__rampa" id="leyenda-bajo" aria-hidden="true"></span>Bajo la referencia</li>
+            <li><span class="leyenda__linea" aria-hidden="true"></span>Referencia 30&nbsp;°C</li>
+            <li><span class="leyenda__linea leyenda__linea--tendencia" aria-hidden="true"></span>Tendencia</li>
+          </ul>
+
+          <div class="grafico" id="grafico">
+            <svg class="grafico__lienzo" role="img" tabindex="0"
+                 aria-label="Gráfico de temperatura de la sesión. Aún no hay lecturas."
+                 aria-describedby="grafico-ayuda"></svg>
+            <div class="grafico__pista" hidden></div>
+          </div>
+          <p class="visualmente-oculto" id="grafico-ayuda">Con el gráfico enfocado, las flechas izquierda y derecha recorren las lecturas una por una.</p>
+          <p class="visualmente-oculto" id="grafico-voz" aria-live="polite"></p>
+
+          <details class="tabla" id="detalle-tabla">
+            <summary><span>Ver las lecturas de la ventana en una tabla</span></summary>
+            <div class="tabla__marco" tabindex="0" role="region" aria-label="Lecturas de la ventana">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col" class="num">N.º</th>
+                    <th scope="col" class="num">Tiempo</th>
+                    <th scope="col" class="num">Temperatura</th>
+                    <th scope="col" class="num">Humedad</th>
+                    <th scope="col">Binario</th>
+                    <th scope="col">Hex</th>
+                    <th scope="col">Color</th>
+                  </tr>
+                </thead>
+                <tbody id="tabla-cuerpo" translate="no"></tbody>
+              </table>
+              <p class="tabla__vacia" id="tabla-vacia">Aún no hay lecturas en esta sesión.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="pie">
+      <p>Proyecto de Electrónica Digital. Programa de Ingeniería de Sistemas, Corporación Universitaria Latinoamericana (CUL), Barranquilla, 2026.</p>
+      <p>Camilo Herrera, Juan Sanjuanelo, Edwin Rueda y Ricardo Nolasco.</p>
+    </footer>
+
+  </div>
+
+  <script src="js/formato.js" defer></script>
+  <script src="js/color.js" defer></script>
+  <script src="js/binario.js" defer></script>
+  <script src="js/simulador.js" defer></script>
+  <script src="js/serial.js" defer></script>
+  <script src="js/grafico.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>

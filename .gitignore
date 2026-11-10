@@ -1,0 +1,4 @@
+# Herramientas del asistente de programación: no son parte del proyecto
+.claude/
+.agents/
+skills-lock.json

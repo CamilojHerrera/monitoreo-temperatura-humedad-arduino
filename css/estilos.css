@@ -1,0 +1,1470 @@
+/* ==========================================================================
+   Monitoreo de temperatura y humedad: estilos
+
+   Idea de diseño
+   - La página es una ficha técnica en tonos neutros. Todo el color que aparece
+     en pantalla es un dato: sale de la temperatura medida y de la paleta de la
+     sesión (Tabla 6 de la propuesta). No hay colores de adorno.
+   - Las dos piezas oscuras, la tira del byte y la matriz, funcionan como
+     módulos de LED. Sobre fondo oscuro un bit en 1 se ve encendido aunque su
+     color sea casi blanco, que es lo que pasa cerca de los 30 °C.
+   - La letra es Bahnschrift (DIN 1451, la de los rótulos y planos técnicos).
+     Viene con Windows, así que la página no descarga nada y funciona sin
+     internet. Consolas se usa solo para cadenas de código: hexadecimal, bits
+     y la trama JSON.
+   ========================================================================== */
+
+:root {
+  /* Superficies y tinta */
+  --papel: #F2F3F3;          /* fondo de la página */
+  --hoja: #FFFFFF;           /* fondo del gráfico y de los campos */
+  --tinta: #1E2227;          /* texto y líneas principales */
+  --tinta-2: #57606A;        /* texto de apoyo */
+  --regla: #D5D9DD;          /* separadores suaves */
+  --regla-fuerte: #A4ABB3;   /* separadores marcados */
+  --borde-control: #78818A;  /* borde de botones y campos */
+
+  /* Módulos oscuros */
+  --panel: #1F2328;          /* cuerpo del módulo */
+  --panel-apagado: #30363C;  /* casilla en 0 */
+  --panel-tinta: #BCC4CB;    /* dígito de una casilla en 0 */
+
+  /* Tipografía. Escala de base 16 px y razón 1,25: 12,8 / 16 / 20 / 25 */
+  --fuente: Bahnschrift, "DIN Alternate", "DIN 2014", "Segoe UI", system-ui, sans-serif;
+  --mono: Consolas, "Cascadia Mono", "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+  --texto-marca: 0.75rem;
+  --texto-nota: 0.8125rem;
+  --texto-ui: 0.875rem;
+  --texto-apoyo: 0.9375rem;
+  --texto-cuerpo: 1rem;
+  --texto-titulo: 1.25rem;
+  --texto-cabecera: 1.5625rem;
+
+  /* Espacios */
+  --e1: 0.25rem;
+  --e2: 0.5rem;
+  --e3: 0.75rem;
+  --e4: 1rem;
+  --e5: 1.5rem;
+  --e6: 2rem;
+  --e7: 3rem;
+
+  --radio-s: 2px;   /* casillas */
+  --radio-m: 6px;   /* módulos, botones y campos */
+
+  --salida: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--fuente);
+  font-size: var(--texto-cuerpo);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd,
+ul,
+figure {
+  margin: 0;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+code {
+  font-family: var(--mono);
+}
+
+::selection {
+  background: var(--tinta);
+  color: var(--papel);
+}
+
+:focus-visible {
+  outline: 2px solid var(--tinta);
+  outline-offset: 2px;
+}
+
+.visualmente-oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.salto {
+  position: absolute;
+  top: var(--e2);
+  left: var(--e2);
+  z-index: 10;
+  padding: var(--e2) var(--e4);
+  border-radius: var(--radio-m);
+  background: var(--tinta);
+  color: var(--papel);
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+
+.salto:focus {
+  transform: none;
+}
+
+.num {
+  text-align: end;
+}
+
+/* --------------------------------------------------------------------------
+   Página y cabecera
+   -------------------------------------------------------------------------- */
+
+.pagina {
+  max-width: 94rem;
+  margin-inline: auto;
+  padding: var(--e5) clamp(1rem, 3vw, 2.75rem) var(--e7);
+}
+
+.cabecera {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--e4) var(--e6);
+  padding-bottom: var(--e5);
+}
+
+.cabecera__titulo {
+  font-size: var(--texto-cabecera);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.cabecera__bajada {
+  margin-top: var(--e1);
+  max-width: 62ch;
+  color: var(--tinta-2);
+  text-wrap: pretty;
+}
+
+/* De dónde vienen los datos: estado de la conexión y sus botones */
+
+.fuente {
+  display: grid;
+  justify-items: end;
+  gap: var(--e2);
+}
+
+.fuente__estado {
+  display: flex;
+  align-items: center;
+  gap: var(--e2);
+  font-size: var(--texto-apoyo);
+}
+
+.fuente__marca {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1.5px solid var(--tinta-2);
+  border-radius: 50%;
+}
+
+.fuente__marca[data-estado="espera"] {
+  border-color: var(--tinta);
+}
+
+.fuente__marca[data-estado="arduino"] {
+  border-color: var(--tinta);
+  background: var(--tinta);
+}
+
+/* Medio círculo: los datos son simulados, no medidos */
+.fuente__marca[data-estado="simulacion"] {
+  border-color: var(--tinta);
+  background: linear-gradient(90deg, var(--tinta) 50%, transparent 50%);
+}
+
+.fuente__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--e2) var(--e3);
+}
+
+.fuente__ayuda,
+.fuente__nota {
+  max-width: 46ch;
+  font-size: var(--texto-apoyo);
+  text-align: end;
+  text-wrap: pretty;
+}
+
+.fuente__ayuda {
+  font-weight: 600;
+}
+
+.fuente__nota {
+  color: var(--tinta-2);
+}
+
+/* --------------------------------------------------------------------------
+   Botones y selector de ritmo
+   -------------------------------------------------------------------------- */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 var(--e4);
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-m);
+  background: transparent;
+  font-size: var(--texto-apoyo);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms var(--salida), background-color 120ms ease, border-color 120ms ease;
+}
+
+.boton:active {
+  transform: scale(0.97);
+}
+
+.boton--primario {
+  border-color: var(--tinta);
+  background: var(--tinta);
+  color: var(--papel);
+}
+
+.boton--menor {
+  min-height: 2rem;
+  padding: 0 var(--e3);
+  font-size: var(--texto-ui);
+}
+
+.boton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .boton:hover:not(:disabled) {
+    border-color: var(--tinta);
+    background: var(--hoja);
+  }
+
+  .boton--primario:hover:not(:disabled) {
+    background: #353B42;
+  }
+}
+
+.ritmo {
+  display: flex;
+  align-items: center;
+}
+
+.ritmo__titulo {
+  margin-right: var(--e2);
+  font-size: var(--texto-ui);
+  color: var(--tinta-2);
+  white-space: nowrap;
+}
+
+.ritmo__opcion {
+  position: relative;
+  display: inline-flex;
+}
+
+.ritmo__opcion input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ritmo__opcion span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 var(--e3);
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-m) 0 0 var(--radio-m);
+  font-size: var(--texto-apoyo);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ritmo__opcion + .ritmo__opcion span {
+  margin-left: -1px;
+  border-radius: 0 var(--radio-m) var(--radio-m) 0;
+}
+
+.ritmo__opcion input:checked + span {
+  border-color: var(--tinta);
+  background: var(--tinta);
+  color: var(--papel);
+}
+
+.ritmo__opcion input:focus-visible + span {
+  outline: 2px solid var(--tinta);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ritmo__opcion input:not(:checked):hover + span {
+    border-color: var(--tinta);
+    background: var(--hoja);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Zonas: una guía a la izquierda y el contenido a la derecha
+   -------------------------------------------------------------------------- */
+
+.zona {
+  display: grid;
+  grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr);
+  column-gap: clamp(1.5rem, 3.2vw, 3.5rem);
+  padding-block: var(--e5) var(--e7);
+  border-top: 1px solid var(--tinta);
+}
+
+.zona__titulo {
+  font-size: var(--texto-titulo);
+  font-weight: 600;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.zona__nota {
+  margin-top: var(--e2);
+  font-size: var(--texto-apoyo);
+  color: var(--tinta-2);
+  text-wrap: pretty;
+}
+
+.zona__cuerpo {
+  min-width: 0;
+}
+
+.bloque__titulo {
+  font-size: var(--texto-cuerpo);
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.sesion {
+  display: grid;
+  justify-items: start;
+  gap: var(--e3);
+  margin-top: var(--e5);
+}
+
+.sesion__dato {
+  display: grid;
+}
+
+.sesion__numero {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sesion__paleta {
+  font-size: var(--texto-apoyo);
+  color: var(--tinta-2);
+}
+
+.edicion {
+  display: grid;
+  justify-items: start;
+  gap: var(--e3);
+  margin-top: var(--e5);
+  padding: var(--e3) var(--e4);
+  border: 1px solid var(--tinta);
+  border-radius: var(--radio-m);
+  background: var(--hoja);
+  font-size: var(--texto-apoyo);
+}
+
+/* --------------------------------------------------------------------------
+   Casillas de bit (se usan en la tira del byte y en la matriz)
+   -------------------------------------------------------------------------- */
+
+.celda {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radio-s);
+  background-color: var(--panel-apagado);
+  color: var(--panel-tinta);
+  font-weight: 400;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+/* El borde claro deja ver que la casilla está encendida aunque el color sea oscuro */
+.celda[data-bit="1"] {
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.32);
+}
+
+/* --------------------------------------------------------------------------
+   Zona 1: lectura actual
+   -------------------------------------------------------------------------- */
+
+.lectura {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: clamp(2rem, 4.5vw, 4.5rem);
+  row-gap: var(--e5);
+}
+
+.lectura__temperatura {
+  display: flex;
+  align-items: flex-start;
+  font-size: clamp(5.5rem, 9.5vw, 8.75rem);
+  font-weight: 300;
+  line-height: 0.82;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lectura__cifra,
+.lectura__unidad {
+  text-box: trim-both cap alphabetic;
+}
+
+.lectura__unidad {
+  margin-left: 0.16em;
+  font-size: 0.3em;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.lectura__datos {
+  display: grid;
+  gap: var(--e1);
+  margin-top: var(--e5);
+}
+
+.lectura__datos div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--e4);
+}
+
+.lectura__datos dt {
+  color: var(--tinta-2);
+}
+
+.lectura__datos dd {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* El byte, dibujado como el registro de una hoja de datos:
+   nombres arriba, casillas en la tira oscura, pesos abajo y un dígito
+   hexadecimal por cada grupo de cuatro bits. */
+
+.byte {
+  min-width: 0;
+}
+
+.byte__rejilla {
+  --celda: clamp(1.75rem, 5vw, 4.75rem);
+  --hueco: 0.25rem;
+  --nibble: 0.75rem;
+  --relleno: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(4, var(--celda)) var(--nibble) repeat(4, var(--celda));
+  grid-template-rows: auto var(--celda) auto auto auto;
+  column-gap: var(--hueco);
+  justify-content: start;
+  padding-inline: var(--relleno);
+}
+
+.byte__nombre {
+  grid-row: 1;
+  padding-bottom: calc(var(--relleno) + 0.4375rem);
+  font-size: var(--texto-nota);
+  line-height: 1;
+  color: var(--tinta-2);
+  text-align: center;
+}
+
+.byte__tira {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  margin: calc(var(--relleno) * -1);
+  border-radius: var(--radio-m);
+  background: var(--panel);
+}
+
+.byte__celda {
+  position: relative;
+  grid-row: 2;
+  font-size: calc(var(--celda) * 0.44);
+}
+
+.byte__peso {
+  grid-row: 3;
+  padding-top: calc(var(--relleno) + 0.4375rem);
+  font-size: var(--texto-ui);
+  line-height: 1;
+  color: var(--tinta-2);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.byte__peso[data-activo="true"] {
+  color: var(--tinta);
+  font-weight: 600;
+}
+
+.byte__corchete {
+  grid-row: 4;
+  height: 0.375rem;
+  margin-top: var(--e2);
+  border: 1px solid var(--regla-fuerte);
+  border-top: 0;
+}
+
+.byte__digito {
+  grid-row: 5;
+  margin-top: var(--e1);
+  font-size: var(--texto-cuerpo);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.byte__pie {
+  display: grid;
+  gap: var(--e1);
+  max-width: 64ch;
+  margin-top: var(--e4);
+  font-size: var(--texto-apoyo);
+  font-variant-numeric: tabular-nums;
+  text-wrap: pretty;
+}
+
+#byte-hex {
+  color: var(--tinta-2);
+}
+
+.trama {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--e1) var(--e3);
+  padding-top: var(--e3);
+  border-top: 1px solid var(--regla);
+  font-size: var(--texto-ui);
+  color: var(--tinta-2);
+}
+
+.trama__texto {
+  font-size: var(--texto-ui);
+  color: var(--tinta);
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------------------
+   Zona 2: matriz de bits, valor de 64 bits y color en uso
+   -------------------------------------------------------------------------- */
+
+/* Arriba, la matriz y a su lado el color en uso. Debajo, el valor de 64 bits,
+   que es la misma matriz escrita en hexadecimal y en binario. */
+.tablero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "matriz color"
+    "valor  valor";
+  align-items: start;
+  column-gap: clamp(2rem, 4vw, 4rem);
+  row-gap: var(--e5);
+}
+
+.matriz {
+  grid-area: matriz;
+  --celda: clamp(1.75rem, 2.3vw, 2.25rem);
+  --hueco: 0.1875rem;
+  --relleno: 0.5rem;
+  --col-valor: 4.25rem;
+  --col-hex: 2.75rem;
+  --aire: 1rem;
+  display: grid;
+  row-gap: var(--e2);
+  font-variant-numeric: tabular-nums;
+}
+
+.matriz__cabeza,
+.matriz__fila {
+  display: grid;
+  grid-template-columns: var(--col-valor) repeat(8, var(--celda)) var(--col-hex);
+  align-items: center;
+  column-gap: var(--hueco);
+}
+
+.matriz__nombre {
+  font-size: var(--texto-marca);
+  line-height: 1;
+  color: var(--tinta-2);
+  text-align: center;
+}
+
+.matriz__nombre--valor {
+  padding-inline-end: var(--aire);
+  text-align: end;
+}
+
+.matriz__nombre--hex {
+  padding-inline-start: var(--aire);
+  text-align: start;
+}
+
+/* El panel oscuro queda fijo detrás de las casillas; las filas se deslizan
+   por encima cuando entra una lectura nueva. */
+.matriz__filas {
+  position: relative;
+  overflow: hidden;
+  padding-block: var(--relleno);
+}
+
+.matriz__filas::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--col-valor) + var(--hueco) - var(--relleno));
+  width: calc(8 * var(--celda) + 7 * var(--hueco) + 2 * var(--relleno));
+  border-radius: var(--radio-m);
+  background: var(--panel);
+}
+
+.matriz__pista {
+  position: relative;
+  display: grid;
+  row-gap: var(--hueco);
+}
+
+.matriz__valor {
+  padding-inline-end: var(--aire);
+  font-size: var(--texto-ui);
+  line-height: 1;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.matriz__hex {
+  padding-inline-start: var(--aire);
+  font-family: var(--mono);
+  font-size: var(--texto-ui);
+  line-height: 1;
+}
+
+.matriz__casilla {
+  display: grid;
+}
+
+.matriz__celda {
+  width: var(--celda);
+  height: var(--celda);
+  padding: 0;
+  border: 0;
+  font-family: inherit;
+  font-size: max(0.75rem, calc(var(--celda) * 0.42));
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 160ms ease, color 160ms ease, transform 100ms var(--salida);
+}
+
+.matriz__celda:active {
+  transform: scale(0.94);
+}
+
+/* Cuando el cambio lo hace la persona, el color cambia al instante */
+.matriz--directa .matriz__celda {
+  transition: transform 100ms var(--salida);
+}
+
+.matriz__celda:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #FFFFFF;
+  outline-offset: 1px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .matriz__celda:hover {
+    box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.65);
+  }
+}
+
+/* Valor de 64 bits */
+
+.valor64 {
+  grid-area: valor;
+  display: grid;
+  grid-template-columns: auto auto minmax(14rem, 24rem);
+  grid-template-areas: "hex bits carga";
+  align-items: start;
+  justify-content: start;
+  gap: var(--e4) clamp(2rem, 4vw, 4rem);
+  min-width: 0;
+  padding-top: var(--e4);
+  border-top: 1px solid var(--regla);
+}
+
+.valor64__grupo {
+  display: grid;
+  justify-items: start;
+  gap: var(--e2);
+  min-width: 0;
+}
+
+.valor64__grupo--hex {
+  grid-area: hex;
+}
+
+.valor64__grupo--bits {
+  grid-area: bits;
+}
+
+.valor64__hex {
+  font-family: var(--mono);
+  font-size: var(--texto-titulo);
+  line-height: 1.3;
+}
+
+.valor64__bits {
+  max-width: 36ch;
+  font-family: var(--mono);
+  font-size: var(--texto-nota);
+  line-height: 1.5;
+  color: var(--tinta-2);
+}
+
+.carga {
+  grid-area: carga;
+  display: grid;
+  gap: var(--e2);
+  min-width: 0;
+}
+
+.carga__rotulo {
+  font-size: var(--texto-apoyo);
+  font-weight: 600;
+}
+
+.carga__fila {
+  display: flex;
+  gap: var(--e2);
+}
+
+.carga__campo {
+  flex: 1;
+  min-width: 0;
+  height: 2.5rem;
+  padding: 0 var(--e3);
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-m);
+  background: var(--hoja);
+  font-family: var(--mono);
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.carga__campo::placeholder {
+  color: #6B747D;
+  text-transform: none;
+}
+
+.carga__campo[aria-invalid="true"] {
+  border-color: var(--tinta);
+  box-shadow: inset 0 0 0 1px var(--tinta);
+}
+
+.carga__error {
+  font-size: var(--texto-apoyo);
+  font-weight: 600;
+}
+
+/* Sin mensaje no ocupa espacio, pero sigue en la página para que el lector de
+   pantalla anuncie el error cuando aparezca. */
+.carga__error:empty {
+  margin-top: calc(var(--e2) * -1);
+}
+
+.carga__ayuda {
+  font-size: var(--texto-nota);
+  color: var(--tinta-2);
+}
+
+/* Color en uso */
+
+.color {
+  grid-area: color;
+  container: color / inline-size;
+  display: grid;
+  gap: var(--e3);
+  min-width: 0;
+}
+
+.color__ficha {
+  display: flex;
+  align-items: stretch;
+  gap: var(--e4);
+}
+
+.color__muestra {
+  flex: none;
+  width: 5.5rem;
+  min-height: 4.5rem;
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-m);
+  background-color: var(--hoja);
+  transition: background-color 200ms ease;
+}
+
+.color__codigos {
+  display: grid;
+  align-content: center;
+  gap: var(--e1);
+}
+
+.color__codigos div {
+  display: grid;
+  grid-template-columns: 2.5rem auto;
+  align-items: baseline;
+}
+
+.color__codigos dt {
+  font-size: var(--texto-nota);
+  color: var(--tinta-2);
+}
+
+.color__codigos dd {
+  font-family: var(--mono);
+  font-size: var(--texto-titulo);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.color__explica {
+  max-width: 60ch;
+  font-size: var(--texto-apoyo);
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta-2);
+  text-wrap: pretty;
+}
+
+.canales__marco {
+  max-width: 32rem;
+  overflow-x: auto;
+}
+
+.canales {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--texto-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.canales th,
+.canales td {
+  padding: 0.3125rem var(--e2);
+  border-bottom: 1px solid var(--regla);
+  font-weight: 400;
+  text-align: start;
+  white-space: nowrap;
+}
+
+.canales th.num,
+.canales td.num {
+  text-align: end;
+}
+
+.canales thead th {
+  border-bottom-color: var(--regla-fuerte);
+  font-size: var(--texto-nota);
+  color: var(--tinta-2);
+}
+
+.canales tbody th,
+.canales .canales__resultado {
+  font-weight: 600;
+}
+
+.canales td:last-child {
+  color: var(--tinta-2);
+}
+
+.color__base16 {
+  display: none;
+  font-size: var(--texto-nota);
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta-2);
+}
+
+/* Si el bloque es angosto, la última columna pasa a ser una lista debajo */
+@container color (max-width: 27rem) {
+  .canales th:last-child,
+  .canales td:last-child {
+    display: none;
+  }
+
+  .color__base16 {
+    display: grid;
+  }
+}
+
+.canales .codigo {
+  font-family: var(--mono);
+}
+
+.muestra {
+  display: inline-block;
+  width: 0.6875rem;
+  height: 0.6875rem;
+  margin-right: 0.375rem;
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-s);
+  vertical-align: -1px;
+}
+
+/* --------------------------------------------------------------------------
+   Zona 3: gráfico de temperatura
+   -------------------------------------------------------------------------- */
+
+.resumen {
+  display: grid;
+  margin-top: var(--e5);
+  font-size: var(--texto-apoyo);
+}
+
+.resumen div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--e4);
+  padding-block: 0.3125rem;
+  border-bottom: 1px solid var(--regla);
+}
+
+.resumen dt {
+  color: var(--tinta-2);
+}
+
+.resumen dd {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e2) var(--e5);
+  margin-bottom: var(--e3);
+  font-size: var(--texto-ui);
+  color: var(--tinta-2);
+}
+
+.leyenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e2);
+  white-space: nowrap;
+}
+
+/* Las ocho bandas de cada lado de la referencia, de la más suave a la más intensa */
+.leyenda__rampa {
+  display: inline-flex;
+  width: 3.5rem;
+  height: 0.625rem;
+  border: 1px solid var(--regla-fuerte);
+}
+
+.leyenda__rampa i {
+  flex: 1;
+}
+
+.leyenda__linea {
+  width: 1.5rem;
+  border-top: 1px solid var(--tinta);
+}
+
+.leyenda__linea--tendencia {
+  border-top: 1.5px dashed var(--tinta);
+}
+
+.grafico {
+  position: relative;
+}
+
+.grafico__lienzo {
+  display: block;
+  width: 100%;
+  height: clamp(16rem, 28vw, 23rem);
+  overflow: visible;
+  touch-action: pan-y;
+}
+
+.grafico__lienzo:focus-visible {
+  outline-offset: 4px;
+}
+
+.grafico__fondo {
+  fill: var(--hoja);
+}
+
+.grafico__rejilla {
+  stroke: #EDEFF1;
+  stroke-width: 1;
+}
+
+.grafico__rejilla--mayor {
+  stroke: #DDE1E4;
+}
+
+.grafico__referencia {
+  stroke: var(--tinta);
+  stroke-width: 1;
+}
+
+.grafico__tendencia {
+  stroke: var(--tinta);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 5;
+}
+
+.grafico__curva {
+  fill: none;
+  stroke: var(--tinta);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.grafico__halo {
+  fill: var(--hoja);
+}
+
+.grafico__punto {
+  stroke: var(--tinta);
+  stroke-width: 1.5;
+}
+
+.grafico__eje {
+  fill: var(--tinta-2);
+  font-size: var(--texto-marca);
+  font-variant-numeric: tabular-nums;
+}
+
+.grafico__eje--referencia {
+  fill: var(--tinta);
+  font-weight: 600;
+}
+
+/* Líneas claras que separan las bandas de 1 °C dentro del área */
+.grafico__separador {
+  stroke: var(--hoja);
+  stroke-width: 1;
+}
+
+/* Lectura actual: línea de nivel y marca en el margen derecho */
+.grafico__nivel {
+  stroke: var(--regla-fuerte);
+  stroke-width: 1;
+}
+
+.grafico__marca {
+  stroke: var(--tinta);
+  stroke-width: 1;
+}
+
+.grafico__marca-texto {
+  font-size: var(--texto-nota);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.grafico__extremo {
+  fill: var(--tinta);
+  font-size: var(--texto-marca);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  paint-order: stroke;
+  stroke: var(--hoja);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.grafico__franja {
+  fill: rgb(30 34 39 / 0.08);
+}
+
+.grafico__vacio {
+  fill: var(--tinta-2);
+  font-size: var(--texto-apoyo);
+}
+
+.grafico__cruz {
+  stroke: var(--tinta-2);
+  stroke-width: 1;
+}
+
+/* Pista flotante del gráfico */
+
+.grafico__pista {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  min-width: 10.5rem;
+  padding: 0.625rem var(--e3);
+  border-radius: var(--radio-m);
+  background: var(--panel);
+  color: #F2F3F3;
+  font-size: var(--texto-nota);
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.pista__valor {
+  display: flex;
+  align-items: center;
+  gap: var(--e2);
+  margin-bottom: var(--e1);
+  font-size: var(--texto-titulo);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.pista__clave {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radio-s);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.32);
+}
+
+.pista__datos div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--e4);
+}
+
+.pista__datos dt {
+  color: var(--panel-tinta);
+}
+
+.pista__datos dd {
+  font-weight: 600;
+}
+
+/* Tabla con las mismas lecturas del gráfico */
+
+.tabla {
+  margin-top: var(--e3);
+}
+
+.tabla summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e2);
+  min-height: 2.5rem;
+  font-size: var(--texto-apoyo);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.tabla summary::-webkit-details-marker {
+  display: none;
+}
+
+.tabla summary::before {
+  content: "+";
+  display: inline-grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-s);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.tabla[open] summary::before {
+  content: "\2212";
+}
+
+.tabla summary span {
+  text-decoration: underline;
+  text-decoration-thickness: from-font;
+  text-underline-position: from-font;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tabla summary:hover::before {
+    border-color: var(--tinta);
+    background: var(--hoja);
+  }
+
+  .tabla summary:hover span {
+    text-decoration-thickness: 2px;
+  }
+}
+
+.tabla__marco {
+  max-height: 22rem;
+  margin-top: var(--e2);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--regla);
+  border-radius: var(--radio-m);
+  background: var(--hoja);
+}
+
+.tabla table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--texto-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla th,
+.tabla td {
+  padding: 0.375rem var(--e3);
+  border-bottom: 1px solid var(--regla);
+  text-align: start;
+  white-space: nowrap;
+}
+
+.tabla th.num,
+.tabla td.num {
+  text-align: end;
+}
+
+.tabla thead th {
+  position: sticky;
+  top: 0;
+  background: var(--hoja);
+  box-shadow: inset 0 -1px 0 var(--regla-fuerte);
+  font-size: var(--texto-nota);
+  font-weight: 600;
+  color: var(--tinta-2);
+}
+
+.tabla .codigo {
+  font-family: var(--mono);
+}
+
+.tabla__vacia {
+  padding: var(--e4);
+  font-size: var(--texto-apoyo);
+  color: var(--tinta-2);
+}
+
+/* --------------------------------------------------------------------------
+   Pie
+   -------------------------------------------------------------------------- */
+
+.pie {
+  display: grid;
+  gap: var(--e1);
+  padding-top: var(--e4);
+  border-top: 1px solid var(--tinta);
+  font-size: var(--texto-nota);
+  color: var(--tinta-2);
+}
+
+/* --------------------------------------------------------------------------
+   Pantallas más angostas
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1280px) {
+  .valor64 {
+    grid-template-columns: auto minmax(14rem, 24rem);
+    grid-template-areas:
+      "hex  carga"
+      "bits carga";
+  }
+}
+
+@media (max-width: 1040px) {
+  .zona {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--e5);
+  }
+
+  .zona__nota {
+    max-width: 62ch;
+  }
+
+  .sesion {
+    grid-auto-flow: column;
+    align-items: center;
+    justify-content: start;
+    gap: var(--e4);
+    margin-top: var(--e4);
+  }
+
+  .edicion {
+    margin-top: var(--e4);
+  }
+
+  .resumen {
+    grid-template-columns: repeat(4, auto);
+    justify-content: start;
+    column-gap: var(--e6);
+    margin-top: var(--e4);
+  }
+
+  .resumen div {
+    display: grid;
+    gap: 0;
+    padding: 0;
+    border: 0;
+  }
+}
+
+@media (max-width: 860px) {
+  .cabecera {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .fuente {
+    justify-items: start;
+  }
+
+  .fuente__acciones {
+    justify-content: flex-start;
+  }
+
+  .fuente__ayuda {
+    text-align: start;
+  }
+
+  .tablero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "matriz"
+      "valor"
+      "color";
+  }
+}
+
+@media (max-width: 720px) {
+  .lectura {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .valor64 {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "hex"
+      "bits"
+      "carga";
+  }
+
+  .carga {
+    max-width: 24rem;
+  }
+
+  .byte__rejilla {
+    --celda: clamp(1.75rem, calc((100vw - 5.75rem) / 8), 3.25rem);
+  }
+
+  .resumen {
+    grid-template-columns: repeat(2, auto);
+    row-gap: var(--e3);
+  }
+}
+
+@media (max-width: 480px) {
+  .matriz {
+    --col-valor: 3.5rem;
+    --col-hex: 2.25rem;
+    --aire: 0.625rem;
+    --celda: clamp(1.5rem, calc((100vw - 9.5rem) / 8), 2.25rem);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Movimiento reducido: se conservan los cambios de color y se quita el
+   desplazamiento. La entrada deslizada de la matriz se apaga desde app.js.
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .boton,
+  .matriz__celda {
+    transition-property: background-color, border-color, color;
+  }
+
+  .boton:active,
+  .matriz__celda:active {
+    transform: none;
+  }
+}
